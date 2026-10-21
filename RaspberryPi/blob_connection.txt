@@ -1,0 +1,5 @@
+# Replace with real Azure Blob Storage values.
+# Format:
+# <storage-account-name>
+# <storage-account-key>
+# <container-name>

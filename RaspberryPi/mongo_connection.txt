@@ -1,0 +1,6 @@
+# Legacy compatibility only.
+# This MongoDB configuration is retained for old web-app compatibility and is not the preferred live persistence layer.
+# Replace with your real MongoDB connection string and database name if needed.
+# Example:
+# mongodb+srv://<username>:<password>@<cluster>.mongodb.net/?retryWrites=true&w=majority&appName=GreenCommute
+# GreenCommuteDB

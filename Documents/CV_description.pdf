@@ -1,0 +1,22 @@
+The initial version of this Internet of Things project was developed
+using simulated devices in Azure IoT Hub. This project collects air
+quality data from the sensor and intersection data from cameras
+in order to make AI based (scikit-learn, Random Forest) traffic
+routing decisions. Azure IoT Hub was used for data collection and
+message routing, while Azure IoT Explorer was used message
+content visualisation. A QLearning Agent to make decisions on
+sending traffic light commands from cloud to device. For
+communicating with a web app MongoDB was used.
+Later, the simulated devices were replaced with: Arduino with air
+quality sensor and LED traffic lights, Raspberry Pi 5 (AI based
+routing, communication with Jetson, Arduino and Azure), NVIDIA
+Jetson Nano with Raspberry Pi v2 Cameras (C++ DeepStream AI
+image processing for vehicle counting and traffic light state
+detection). For low-level pixel processing C++ CUDA was used for
+matrix and vector operations, taking advantage of the Jetson's full
+capabilities. Data sets backups were also sent periodically (Linux
+cron jobs) to Azure Blob Storage. End-to-end data flow, AI
+accuracy, performance, reliability and multi user aspects about
+this project are still in developement.
+Simulated devices version:
+https://github.com/ZavoiCalin/SmartTraffic525
