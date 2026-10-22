@@ -20,7 +20,7 @@ The older simulated Azure IoT Hub + MongoDB architecture remains part of the his
 
 ## Current maturity
 
-The project is in an active development state with a clear architectural direction and a working local validation path. The Python-based route logic is successfully executable in the current environment using a dedicated virtual environment and PowerShell launcher. This ensures the project remains runnable without full cloud or hardware dependencies while the embedded and deployment layers are being developed.
+The project is in an active development state with a clear architectural direction and a working local validation path. The Python-based route logic is successfully executable in the current environment using a dedicated virtual environment and the cross-platform Go launcher. This ensures the project remains runnable without full cloud or hardware dependencies while the embedded and deployment layers are being developed.
 
 The embedded STM32 path has been migrated to a CubeIDE-style project structure aligned with the NUCLEO-N657X0-Q target. This includes the sensor-node logic, board configuration, traffic analytics logic, and UART/Bluetooth-oriented telemetry format intended to match the hardware-first system design. The project is structurally complete for import into STM32CubeIDE, but final board-specific validation, pin mapping confirmation, and firmware build/test remain dependent on the real hardware toolchain.
 

@@ -8,14 +8,14 @@ The active project folders are:
 
 - RaspberryPi/ — edge coordination, route logic, traffic control scripts, and cloud/stream pipeline components
 - Jetson/ — Jetson-specific camera and inference assets used alongside the Raspberry Pi runtime
-- Extra/ — additional supporting tools, scripts, and experiments such as camera streaming, Azure blob helpers, and reference integrations
+- MobileApp/ — mobile route app (Expo frontend and Node/Express backend, with Azure Function, FastAPI, and Raspberry Pi backend components and a database schema); see `MobileApp/README.md`
+- Launcher/ — the cross-platform Go launcher
 - STM32/STM32CubeIDE/ — the real STM32 project area used for embedded sensor-node development and traffic analytics logic
-- PythonSetup/ — the current Windows launcher and venv/bootstrap area for local execution
+- PythonSetup/ — Python requirements and the venv for local execution
 
-The following are intentionally kept as reference or archived material, not as the live runtime:
+The following is intentionally kept as reference or archived material, not as the live runtime:
 
-- SimulatedDevicesPrototype/ — historical project snapshot retained for reference and legacy design comparison
-- Extra/Edge_AI/ and similar reference builds — useful examples, not the primary active app
+- SimulatedDevicesPrototype/ — historical project snapshot retained for reference and legacy design comparison (git-ignored)
 
 ## Current architecture
 
@@ -31,27 +31,73 @@ MongoDB is still kept as a legacy compatibility option, but it is not the prefer
 
 ## Current local execution
 
-The active launcher is:
+### Launcher
 
-- `PythonSetup/launch.ps1`
+**Quick start (Windows):** from the project root, build once and run:
 
-Use it from PowerShell in the project root, for example:
+```powershell
+cd Launcher; go build -ldflags "-s -w" -o ..\bin\launch-stms.exe .; cd ..
+.\bin\launch-stms.exe
+```
 
-- `powershell -ExecutionPolicy Bypass -File .\PythonSetup\launch.ps1 -Command route`
-- `powershell -ExecutionPolicy Bypass -File .\PythonSetup\launch.ps1 -Command traffic`
-- `powershell -ExecutionPolicy Bypass -File .\PythonSetup\launch.ps1 -Command cloud`
-- `powershell -ExecutionPolicy Bypass -File .\PythonSetup\launch.ps1 -Command jetson`
-- `powershell -ExecutionPolicy Bypass -File .\PythonSetup\launch.ps1 -Command all`
+Then open http://localhost:8083/ . Stop with `.\bin\launch-stms.exe stop`. On later runs only the last command is needed (add `start --skip-python` to skip the Python setup).
 
-The Python environment is expected to live under `.venv` and is bootstrapped by the PowerShell script when needed.
+**Quick start (Linux / macOS / Raspberry Pi):**
+
+```sh
+cd Launcher && go build -ldflags "-s -w" -o ../bin/launch-stms . && cd ..
+./bin/launch-stms
+```
+
+`Launcher/` contains the single cross-platform launcher (Go, standard library only). It builds to one native executable for Windows, Linux, macOS and Raspberry Pi. At run time it needs Python 3 and Node.js installed. It finds the project root by looking for the `PythonSetup/` folder upward from its own location.
+
+**Build** (needs [Go](https://go.dev/dl/) 1.21+; output goes to `bin/`, which is git-ignored)
+
+- Windows: `cd Launcher; go build -ldflags "-s -w" -o ..\bin\launch-stms.exe .`
+- Linux / macOS / Raspberry Pi: `cd Launcher && go build -ldflags "-s -w" -o ../bin/launch-stms .`
+- Cross-compile by setting `GOOS`/`GOARCH` (for example `GOOS=linux GOARCH=arm64` for a 64-bit Raspberry Pi, `GOOS=darwin GOARCH=arm64` for Apple Silicon).
+
+**Usage**
+
+- Windows: `.\bin\launch-stms.exe [command] [--skip-python]`
+- Linux / macOS / Raspberry Pi: `./bin/launch-stms [command] [--skip-python]`
+
+**Commands**
+
+| Command | What it does |
+|---------|--------------|
+| `start` (default) | Python setup, Node dependency check, then starts the mobile backend and frontend |
+| `stop` | Stops the mobile backend and frontend started by `start` |
+| `status` | Shows whether the backend and frontend are running (exit code 1 if not) |
+| `setup` | Only creates the Python venv and installs `requirements.txt` |
+| `route` | Computes the AI route |
+| `traffic` | Runs the traffic light command script |
+| `train` | Trains the Q-learning policy |
+| `cloud` | Syncs data to Azure IoT Hub / Blob Storage when configured |
+| `jetson` | Launches the Jetson camera stream |
+| `all` | Runs `route`, `traffic` and `cloud` |
+
+**Options:** `--skip-python` (with `start`) skips the Python setup.
+
+**What `start` does**
+
+1. Python setup: creates `PythonSetup/.venv` and installs `requirements.txt`.
+2. Node dependencies: runs `npm install` in `MobileApp/backend/node-express` and `MobileApp/frontend` if packages are missing. Node is found on `PATH` first, then in common install folders (including the Visual Studio bundled Node on Windows).
+3. Start: launches the backend at http://localhost:3000 and the Expo web frontend at http://localhost:8083, then waits until both respond and the web bundle is built. Open the frontend URL in a browser.
+
+Logs go to `MobileApp/logs/` and process IDs to `MobileApp/logs/pids.json`, which `stop` uses. If port 3000 or 8083 is used by another program, `start` exits with a message.
+
+If the app shows "offline", the backend is not running (for example after `stop`): run `status`, then `start`.
+
+The frontend runs without file watching, so after changing frontend code run `stop` and then `start` again.
 
 ## Project layout
 
 - `RaspberryPi/` — current application logic, traffic light command flow, and routing components
 - `Jetson/` — Jetson-specific processing and camera pipeline pieces
-- `Extra/` — additional support scripts, experiments, and integration examples
-- `STM32/STM32CubeIDE/` — active embedded project for the STM32 sensor node and traffic analytics code
-- `PythonSetup/` — environment setup and local command runner
+- `MobileApp/` — mobile route app (frontend, backends, logs, and local start/stop scripts)
+- `Launcher/` — Go source for the launcher- `STM32/STM32CubeIDE/` — active embedded project for the STM32 sensor node and traffic analytics code
+- `PythonSetup/` — Python requirements and virtual environment
 - `PythonSetup/requirements.txt` — active Python dependencies for local tooling
 
 ## Important status notes
@@ -63,13 +109,13 @@ The Python environment is expected to live under `.venv` and is bootstrapped by 
 
 ## Notes
 
-This README reflects the cleaned current workspace state: active project folders are preserved, obsolete Arduino artifacts are removed, and the practical working entry point is the Windows launcher under `PythonSetup/`.
+This README reflects the cleaned current workspace state: active project folders are preserved, obsolete Arduino artifacts are removed, and the practical working entry point is the Go launcher under `Launcher/`.
 
 ## Next steps
 
 Suggested follow-up priorities for the project are:
 
-- Validate the end-to-end startup flow for all launcher modes (`route`, `traffic`, `cloud`, `jetson`, `all`) and confirm the Python environment bootstrap is reliable on clean Windows machines.
+- Validate the end-to-end startup flow for all launcher modes (`route`, `traffic`, `cloud`, `jetson`, `all`) and confirm the Python environment bootstrap is reliable on clean machines (Windows, Linux, macOS, Raspberry Pi).
 - Tighten the Raspberry Pi coordination logic by defining the message contracts between the edge controller, Jetson inference output, and the STM32 sensor telemetry stream.
 - Finalize the deployment configuration for Azure IoT Hub and Blob Storage, including environment variables, secure secrets management, and fallback behavior when cloud connectivity is unavailable.
 - Expand the STM32 sensor-node integration by testing real traffic signal inputs, calibration thresholds, and fault handling for noisy or missing data.

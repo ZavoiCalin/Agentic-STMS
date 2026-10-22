@@ -11,3 +11,4 @@ logs/
 *.log
 *.err
 root.json
+bin/
