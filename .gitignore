@@ -1,0 +1,13 @@
+
+SimulatedDevicesPrototype/
+q_table.npy
+*.pyc
+**/*.pyc
+node_modules/
+**/node_modules/
+logs/
+**/logs/
+.expo/
+**/.expo/
+*.log
+*.err
