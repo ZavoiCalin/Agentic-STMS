@@ -13,6 +13,7 @@ target_include_directories(stms-jetson-cameras PRIVATE ${DEEPSTREAM_INCLUDE_DIRS
 target_link_libraries(stms-jetson-cameras PRIVATE
     PkgConfig::GST
     PkgConfig::DEEPSTREAM
+    CUDA::cuda_driver
     CUDA::cudart
 )
 

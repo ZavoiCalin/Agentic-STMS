@@ -275,8 +275,11 @@ int run_route(const fs::path& root) {
     for (const auto& [intersection, event] : latest_camera_data) {
         json row = event;
         row["intersection"] = intersection;
-        row["vehicle_count"] = number_or(event, "vehicle_count",
-                                          number_or(event, "object_count", 0));
+        const double tracked_count = number_or(event, "tracked_object_count", 0);
+        const double detected_count = number_or(event, "object_count", 0);
+        row["vehicle_count"] = tracked_count > 0 || detected_count == 0
+            ? tracked_count
+            : detected_count;
         row["traffic_volume"] = number_or(event, "traffic_volume", row["vehicle_count"].get<double>());
         row["average_speed"] = number_or(event, "average_speed",
                                          sensor_speed);

@@ -201,20 +201,8 @@ def parse_args():
     parser.add_argument("--traffic", action="store_true", help="Run the traffic-light decision script")
     parser.add_argument("--sync-cloud", action="store_true", help="Upload the latest route/sensor data to Azure IoT Hub and Azure Blob Storage; MongoDB is legacy compatibility only")
     parser.add_argument("--legacy-mongo", action="store_true", help="Optional legacy MongoDB upload for older web-app compatibility")
-    parser.add_argument("--jetson-cameras", action="store_true", help="Launch the dual Jetson camera CUDA stream from the Extra/Edge_AI flow")
-    parser.add_argument("--all", action="store_true", help="Run route, traffic, cloud sync, and the optional Jetson camera task")
+    parser.add_argument("--all", action="store_true", help="Run route, traffic, and cloud sync")
     return parser.parse_args()
-
-
-def run_jetson_cameras():
-    executable_name = "stms-jetson-cameras.exe" if os.name == "nt" else "stms-jetson-cameras"
-    executable = PROJECT_ROOT / "Jetson" / "Cameras_nvidia_cuda" / "build" / executable_name
-    config = os.getenv("STMS_DEEPSTREAM_CONFIG")
-    if not executable.exists():
-        raise FileNotFoundError(f"Jetson DeepStream executable not found: {executable}")
-    if not config:
-        raise ValueError("Set STMS_DEEPSTREAM_CONFIG to the DeepStream inference configuration.")
-    subprocess.run([str(executable), "--config", config], cwd=PROJECT_ROOT, check=True)
 
 
 def main():
@@ -226,11 +214,8 @@ def main():
         run_native("traffic")
     if args.sync_cloud or args.all:
         sync_cloud_data(use_legacy_mongo=args.legacy_mongo)
-    if args.jetson_cameras or args.all:
-        run_jetson_cameras()
-
-    if not any([args.route, args.traffic, args.sync_cloud, args.legacy_mongo, args.jetson_cameras, args.all]):
-        print("No action selected. Use --route, --traffic, --sync-cloud, --legacy-mongo, --jetson-cameras, or --all.")
+    if not any([args.route, args.traffic, args.sync_cloud, args.legacy_mongo, args.all]):
+        print("No action selected. Use --route, --traffic, --sync-cloud, --legacy-mongo, or --all.")
 
 
 if __name__ == "__main__":

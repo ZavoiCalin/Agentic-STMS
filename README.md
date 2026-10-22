@@ -22,7 +22,7 @@ The following is intentionally kept as reference or archived material, not as th
 The current design in this workspace is centered on the following flow:
 
 - Raspberry Pi 5: native C++ route/traffic tools and TCP/Bluetooth-UART telemetry receivers that consume Jetson and sensor readings
-- NVIDIA Jetson: native C++ GStreamer/DeepStream inference using CUDA-backed `nvinfer` on exactly two CSI-connected Raspberry Pi Camera Module v2 cameras (sensor IDs 0 and 1)
+- NVIDIA Jetson: native C++ GStreamer/DeepStream CUDA/TensorRT inference on exactly two CSI-connected Raspberry Pi Camera Module v2 cameras, with Jetson NVMM/Argus capture, batched GPU inference, and GPU NvDCF object tracking
 - STM32 sensor node (NUCLEO-N657X0-Q): C++ application and analytics with CubeIDE/HAL startup, interrupt, and HAL glue retained in C/assembly
 - Azure IoT Hub / Azure Blob Storage: optional cloud integration and persistence for the edge pipeline
 - Mobile application: existing Node.js/Express backend and React Native frontend
@@ -91,14 +91,18 @@ The receiver defaults to TCP port `5000` and `/dev/rfcomm0` on Linux
 (`COM3` on Windows). Override these with `STMS_JETSON_PORT` and
 `STMS_SENSOR_PORT`. The route starts with the road-network weights and adjusts
 outgoing costs at observed intersections using the latest Jetson detection
-count and available speed/weather/sensor readings.
+tracked-object count (falling back to detection count) and available
+speed/weather/sensor readings.
 
 For the camera-to-route flow, start `launch-stms receive-jetson` on the Pi, then
-run the Jetson binary with `STMS_PI_HOST` set to that Pi's address. The Pi
+run the Jetson binary with `STMS_PI_HOST`, `STMS_DEEPSTREAM_CONFIG`, and
+`STMS_TRACKER_CONFIG` set. The Pi
 persists incoming JSONL and recalculates `optimal_route_results.json` for each
 new valid camera report. The Jetson pipeline is configured for exactly two
 Raspberry Pi Camera Module v2 CSI sensors, IDs 0 and 1. `Cam1`/`Cam2` map to
 Intersections A/B unless the event includes an explicit `intersection`.
+Set `STMS_JETSON_HEADLESS=1` when using the launcher without a display; this
+bypasses OSD and avoids unnecessary GPU work.
 
 **What `start` does**
 

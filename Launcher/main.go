@@ -187,12 +187,23 @@ func runJetson() int {
 		fmt.Fprintln(os.Stderr, "Set STMS_DEEPSTREAM_CONFIG to the DeepStream nvinfer configuration file.")
 		return 1
 	}
-	args := []string{"--config", config}
+	trackerConfig := os.Getenv("STMS_TRACKER_CONFIG")
+	if trackerConfig == "" {
+		fmt.Fprintln(os.Stderr, "Set STMS_TRACKER_CONFIG to the DeepStream NvDCF performance tracker configuration.")
+		return 1
+	}
+	args := []string{"--config", config, "--tracker-config", trackerConfig}
+	if trackerLibrary := os.Getenv("STMS_TRACKER_LIBRARY"); trackerLibrary != "" {
+		args = append(args, "--tracker-lib", trackerLibrary)
+	}
 	if piHost != "" {
 		args = append(args, "--pi", piHost)
 	}
 	if port := os.Getenv("STMS_PI_PORT"); port != "" {
 		args = append(args, "--port", port)
+	}
+	if os.Getenv("STMS_JETSON_HEADLESS") == "1" {
+		args = append(args, "--headless")
 	}
 	if err := run(root, nil, executable, args...); err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
