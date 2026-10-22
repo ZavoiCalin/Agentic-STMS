@@ -15,16 +15,25 @@ Pi at most once per second. Tracking IDs reduce count jitter across frames;
 the Pi bases route penalties on tracked-object count when available.
 Confirm JetPack/Argus recognizes both IMX219 sensors before running the app.
 
-Build on the Jetson with the installed JetPack and DeepStream SDK:
+Develop and build this target directly on the Jetson using that device's
+installed JetPack and DeepStream SDK. Clone or update the source on the Jetson;
+no executable or CMake build directory from the host PC is required. The
+matching CUDA toolkit and DeepStream development files must be installed and
+visible through `pkg-config`.
 
 ```sh
-cmake -S ../cpp -B ../build
-cmake --build ../build --config Release
-../build/stms-jetson-cameras \
+cmake -S Jetson/Cameras_nvidia_cuda/cpp -B Jetson/Cameras_nvidia_cuda/build -DCMAKE_BUILD_TYPE=Release
+cmake --build Jetson/Cameras_nvidia_cuda/build --parallel
+Jetson/Cameras_nvidia_cuda/build/stms-jetson-cameras \
   --config /path/to/deepstream-infer-config.txt \
   --tracker-config /opt/nvidia/deepstream/deepstream/samples/configs/deepstream-app/config_tracker_NvDCF_perf.yml \
   --pi RASPBERRY_PI_HOST
 ```
+
+Run those commands from the repository root. Re-run the `cmake --build`
+command after source changes to incrementally rebuild on the Jetson. Validate
+the runtime on the Jetson with its CSI cameras and DeepStream configuration;
+the camera pipeline is hardware- and SDK-specific.
 
 The inference config must set `gpu-id=0`, `batch-size=2`, and
 `network-mode=2` (FP16) or `network-mode=1` (INT8). Use an engine optimized

@@ -34,6 +34,48 @@ MongoDB is still kept as a legacy compatibility option, but it is not the prefer
 
 ## Current local execution
 
+### Independent Raspberry Pi and Jetson development
+
+The Raspberry Pi and Jetson are independent development machines, not runtime
+targets that require this host PC to build for them. Clone the repository (or
+check out the branch you are developing) directly on each board, edit or pull
+the source there, and configure, build, and run tests on that board. Keep each
+board's `build/` output local; do not copy host-built executables or CMake
+build directories between Windows, Raspberry Pi, and Jetson.
+
+**Raspberry Pi 5** — install CMake 3.20+, a C++17 compiler, and Git, then run
+these commands from the repository root:
+
+```sh
+sudo apt update
+sudo apt install -y build-essential cmake git
+cmake -S RaspberryPi/Native -B build/native -DCMAKE_BUILD_TYPE=Release
+cmake --build build/native --parallel
+```
+
+The Pi native target vendors its JSON header, so configuring and rebuilding it
+does not fetch dependencies from the host PC or the network. After changing
+native source, rerun `cmake --build build/native --parallel`; CMake rebuilds
+the target on the Pi. To build and test the Go launcher on the Pi, install Go
+1.21+ and run `cd Launcher && go test ./... && mkdir -p ../bin && go build -o ../bin/launch-stms .`.
+The native C++ target does not currently define a CTest suite.
+
+**NVIDIA Jetson** — use the JetPack installation on the Jetson itself, with
+the matching CUDA toolkit and DeepStream development files available through
+`pkg-config`. From the repository root, build and rebuild the camera target
+using the Jetson's installed compiler and SDK:
+
+```sh
+cmake -S Jetson/Cameras_nvidia_cuda/cpp -B Jetson/Cameras_nvidia_cuda/build -DCMAKE_BUILD_TYPE=Release
+cmake --build Jetson/Cameras_nvidia_cuda/build --parallel
+```
+
+The runtime test requires the Jetson hardware, its two connected CSI cameras,
+and the DeepStream inference/tracker configuration; see the [Jetson runtime
+guide](Jetson/Cameras_nvidia_cuda/Jetson_Stream_TensorRT/dual_stream_tensorrt_doc.md).
+The Jetson camera target cannot be built or meaningfully tested by building
+its executable on this Windows host.
+
 ### Launcher
 
 **Quick start (Windows):** from the project root, build the C++ tools and run:
@@ -56,13 +98,13 @@ cd Launcher && go build -ldflags "-s -w" -o ../bin/launch-stms . && cd ..
 ./bin/launch-stms
 ```
 
-`Launcher/` contains the cross-platform launcher (Go, standard library only). It builds to one native executable for Windows, Linux, macOS and Raspberry Pi. The C++ tools use CMake, a C++17 compiler, and nlohmann/json (fetched by CMake). Python remains required only for the optional, not-yet-migrated cloud commands.
+`Launcher/` contains the cross-platform launcher (Go, standard library only). It builds to one native executable for Windows, Linux, macOS and Raspberry Pi. The C++ tools use CMake, a C++17 compiler, and nlohmann/json (vendored in `RaspberryPi/Native/third_party`, so the build is fully offline). Python remains required only for the optional, not-yet-migrated cloud commands.
 
 **Build** (needs [Go](https://go.dev/dl/) 1.21+, CMake and a C++17 compiler; generated output goes to `bin/` and `build/`)
 
 - Windows: `cmake -S RaspberryPi\Native -B build\native; cmake --build build\native --config Release; cd Launcher; go build -ldflags "-s -w" -o ..\bin\launch-stms.exe .`
 - Linux / macOS / Raspberry Pi: `cmake -S RaspberryPi/Native -B build/native && cmake --build build/native --config Release && cd Launcher && go build -ldflags "-s -w" -o ../bin/launch-stms .`
-- Cross-compile by setting `GOOS`/`GOARCH` (for example `GOOS=linux GOARCH=arm64` for a 64-bit Raspberry Pi, `GOOS=darwin GOARCH=arm64` for Apple Silicon).
+- Optional: cross-compile only the Go launcher by setting `GOOS`/`GOARCH`. This does not build the native C++ or CUDA/DeepStream targets; use the on-device workflows above for those.
 
 **Usage**
 
