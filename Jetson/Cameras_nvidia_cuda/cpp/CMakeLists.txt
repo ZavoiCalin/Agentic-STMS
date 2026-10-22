@@ -1,21 +1,19 @@
-cmake_minimum_required(VERSION 3.10)
-project(DeepStreamAzure)
+cmake_minimum_required(VERSION 3.18)
+project(STMSJetson LANGUAGES CXX)
 
 find_package(PkgConfig REQUIRED)
-pkg_check_modules(GST REQUIRED gstreamer-1.0 gstreamer-video-1.0)
-pkg_check_modules(DEEPSTREAM REQUIRED libnvds_meta)
+pkg_check_modules(GST REQUIRED IMPORTED_TARGET gstreamer-1.0 gstreamer-video-1.0)
+pkg_check_modules(DEEPSTREAM REQUIRED IMPORTED_TARGET libnvds_meta)
 
-include_directories(
-    ${GST_INCLUDE_DIRS}
-    ${DEEPSTREAM_INCLUDE_DIRS}
-    /path/to/azure-iot-sdk-c/umqtt/include
-    /path/to/azure-iot-sdk-c/iothub_client/inc
+find_package(CUDAToolkit REQUIRED)
+
+add_executable(stms-jetson-cameras gst_dual_stream.cpp)
+target_compile_features(stms-jetson-cameras PRIVATE cxx_std_17)
+target_include_directories(stms-jetson-cameras PRIVATE ${DEEPSTREAM_INCLUDE_DIRS})
+target_link_libraries(stms-jetson-cameras PRIVATE
+    PkgConfig::GST
+    PkgConfig::DEEPSTREAM
+    CUDA::cudart
 )
 
-link_directories(
-    ${GST_LIBRARY_DIRS}
-    ${DEEPSTREAM_LIBRARY_DIRS}
-)
-
-add_executable(DeepStreamAzure main.cpp)
-target_link_libraries(DeepStreamAzure ${GST_LIBRARIES} ${DEEPSTREAM_LIBRARIES} iothub_client uamqp umqtt c shared_util)
+target_compile_options(stms-jetson-cameras PRIVATE -Wall -Wextra -Wpedantic)

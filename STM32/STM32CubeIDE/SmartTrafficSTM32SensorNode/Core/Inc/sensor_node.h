@@ -30,9 +30,17 @@ typedef struct {
     uint32_t timestamp_ms;
 } sensor_sample_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void sensor_node_init(sensor_board_config_t *cfg);
 void sensor_node_sample(sensor_sample_t *sample, const sensor_board_config_t *cfg);
 void sensor_node_format_json(const sensor_sample_t *sample, char *buffer, size_t buffer_size);
 void sensor_node_bluetooth_send(const char *json_line);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* SENSOR_NODE_H */

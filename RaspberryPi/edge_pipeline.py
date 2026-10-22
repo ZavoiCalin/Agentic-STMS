@@ -1,5 +1,8 @@
 import argparse
 import json
+import os
+import subprocess
+import sys
 from datetime import datetime
 from pathlib import Path
 
@@ -22,10 +25,9 @@ except Exception:  # pragma: no cover - optional cloud dependency
 
 BASE_DIR = Path(__file__).resolve().parent
 PROJECT_ROOT = BASE_DIR.parent
-ROUTE_SCRIPT = BASE_DIR / "AI_routing_algorithm" / "ai_routing.py"
-TRAFFIC_SCRIPT = BASE_DIR / "Traffic_light_commands" / "main.py"
 ROUTE_RESULTS_PATH = BASE_DIR / "AI_routing_algorithm" / "optimal_route_results.json"
 SENSOR_DATA_PATH = BASE_DIR / "AI_routing_algorithm" / "sensor_data.json"
+NATIVE_BUILD_DIR = PROJECT_ROOT / "build" / "native"
 AZURE_CONNECTION_PATH = BASE_DIR / "SendData" / "primary_connection_string.txt"
 MONGO_CONNECTION_PATH = BASE_DIR / "mongo_connection.txt"
 BLOB_CONNECTION_PATH = BASE_DIR / "blob_connection.txt"
@@ -155,11 +157,21 @@ def upload_json_to_blob(json_file_path, connection_file_path=BLOB_CONNECTION_PAT
         return False
 
 
-def run_python_script(script_path: Path):
-    import subprocess
-    import sys
-
-    subprocess.run([sys.executable, str(script_path)], check=True)
+def run_native(command):
+    executable_name = "stms-native.exe" if os.name == "nt" else "stms-native"
+    candidates = [NATIVE_BUILD_DIR / executable_name]
+    if os.name == "nt":
+        candidates.insert(0, NATIVE_BUILD_DIR / "Release" / executable_name)
+    executable = next((candidate for candidate in candidates if candidate.exists()), None)
+    if executable is None:
+        raise FileNotFoundError(
+            f"Native executable not found under {NATIVE_BUILD_DIR}. Build RaspberryPi/Native with CMake first."
+        )
+    subprocess.run(
+        [str(executable), command, "--root", str(PROJECT_ROOT)],
+        cwd=PROJECT_ROOT,
+        check=True,
+    )
 
 
 def collect_route_payload():
@@ -194,32 +206,28 @@ def parse_args():
     return parser.parse_args()
 
 
-def run_optional_executable(path: Path):
-    if not path.exists():
-        print(f"Optional hardware helper not found: {path}. Skipping.")
-        return
-    if path.suffix.lower() == ".py":
-        run_python_script(path)
-    else:
-        import os
-        if os.name == "nt":
-            print(f"Hardware helper {path} is a native executable; only run on the target Jetson hardware.")
-        else:
-            import subprocess
-            subprocess.run([str(path)], check=True)
+def run_jetson_cameras():
+    executable_name = "stms-jetson-cameras.exe" if os.name == "nt" else "stms-jetson-cameras"
+    executable = PROJECT_ROOT / "Jetson" / "Cameras_nvidia_cuda" / "build" / executable_name
+    config = os.getenv("STMS_DEEPSTREAM_CONFIG")
+    if not executable.exists():
+        raise FileNotFoundError(f"Jetson DeepStream executable not found: {executable}")
+    if not config:
+        raise ValueError("Set STMS_DEEPSTREAM_CONFIG to the DeepStream inference configuration.")
+    subprocess.run([str(executable), "--config", config], cwd=PROJECT_ROOT, check=True)
 
 
 def main():
     args = parse_args()
 
     if args.route or args.all:
-        run_python_script(ROUTE_SCRIPT)
+        run_native("route")
     if args.traffic or args.all:
-        run_python_script(TRAFFIC_SCRIPT)
+        run_native("traffic")
     if args.sync_cloud or args.all:
         sync_cloud_data(use_legacy_mongo=args.legacy_mongo)
     if args.jetson_cameras or args.all:
-        run_optional_executable(PROJECT_ROOT / "Extra" / "Edge_AI" / "build" / "dual_camera_cuda")
+        run_jetson_cameras()
 
     if not any([args.route, args.traffic, args.sync_cloud, args.legacy_mongo, args.jetson_cameras, args.all]):
         print("No action selected. Use --route, --traffic, --sync-cloud, --legacy-mongo, --jetson-cameras, or --all.")

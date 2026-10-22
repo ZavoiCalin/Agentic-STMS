@@ -1,11 +1,12 @@
 // Cross-platform STMS launcher (Windows, Linux, macOS, Raspberry Pi). Standard library only.
 //
-// Usage: launch-stms [command] [--skip-python]
+// Usage: launch-stms [command] [--skip-native]
 //
-//	start    Python setup + Node deps + mobile backend and frontend (default)
+//	start    native build + Node deps + mobile backend and frontend (default)
 //	stop     stop the mobile backend and frontend
-//	setup    only create the Python venv and install requirements
-//	route | traffic | train | cloud | jetson   run a Python pipeline step
+//	setup    build the native Raspberry Pi tools
+//	route | traffic | train   run a native pipeline step
+//	cloud | jetson            run the optional Python integrations
 //	all      run route, traffic and cloud
 package main
 
@@ -32,21 +33,26 @@ const (
 
 var (
 	root        string
-	setupDir    string
-	venvDir     string
 	backendDir  string
 	frontendDir string
 	logsDir     string
 	pidFile     string
+	nativeExe   string
+	nativeBuild string
 	isWin       = runtime.GOOS == "windows"
 )
 
+var nativeCommands = map[string]bool{
+	"route":             true,
+	"traffic":           true,
+	"train":             true,
+	"send-route":        true,
+	"receive-jetson":    true,
+	"receive-bluetooth": true,
+}
+
 var scripts = map[string][]string{
-	"route":   {"RaspberryPi/AI_routing_algorithm/ai_routing.py"},
-	"traffic": {"RaspberryPi/Traffic_light_commands/main.py"},
-	"train":   {"RaspberryPi/Traffic_light_commands/train.py"},
-	"cloud":   {"RaspberryPi/edge_pipeline.py", "--sync-cloud"},
-	"jetson":  {"RaspberryPi/edge_pipeline.py", "--jetson-cameras"},
+	"cloud": {"RaspberryPi/edge_pipeline.py", "--sync-cloud"},
 }
 
 func logf(format string, a ...any) { fmt.Printf(format+"\n", a...) }
@@ -57,7 +63,7 @@ func die(format string, a ...any) {
 }
 
 // findRoot walks up from the executable's folder, then the working directory,
-// until it finds the project root (the folder containing PythonSetup).
+// until it finds the project root.
 func findRoot() string {
 	var starts []string
 	if exe, err := os.Executable(); err == nil {
@@ -68,7 +74,7 @@ func findRoot() string {
 	}
 	for _, dir := range starts {
 		for {
-			if st, err := os.Stat(filepath.Join(dir, "PythonSetup")); err == nil && st.IsDir() {
+			if st, err := os.Stat(filepath.Join(dir, "RaspberryPi", "Native", "CMakeLists.txt")); err == nil && !st.IsDir() {
 				return dir
 			}
 			parent := filepath.Dir(dir)
@@ -78,18 +84,11 @@ func findRoot() string {
 			dir = parent
 		}
 	}
-	die("Could not find the project root (a folder containing PythonSetup).")
+	die("Could not find the project root (a folder containing RaspberryPi/Native/CMakeLists.txt).")
 	return ""
 }
 
 func exists(p string) bool { _, err := os.Stat(p); return err == nil }
-
-func venvPython() string {
-	if isWin {
-		return filepath.Join(venvDir, "Scripts", "python.exe")
-	}
-	return filepath.Join(venvDir, "bin", "python")
-}
 
 func run(dir string, env []string, name string, args ...string) error {
 	cmd := exec.Command(name, args...)
@@ -101,60 +100,141 @@ func run(dir string, env []string, name string, args ...string) error {
 	return cmd.Run()
 }
 
-func systemPython() (string, []string) {
-	for _, n := range []string{"python3", "python", "py"} {
-		p, err := exec.LookPath(n)
-		if err != nil {
-			continue
-		}
-		args := []string{}
-		if n == "py" {
-			args = []string{"-3"}
-		}
-		// Rejects the Windows Store stub, which is on PATH but not a real interpreter.
-		if exec.Command(p, append(args, "--version")...).Run() != nil {
-			continue
-		}
-		return p, args
+func findCMake() string {
+	if path, err := exec.LookPath("cmake"); err == nil {
+		return path
 	}
-	die("Python 3 was not found. Install it from https://www.python.org.")
-	return "", nil
+	if isWin {
+		for _, path := range []string{
+			`C:\Program Files\Microsoft Visual Studio\18\Insiders\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe`,
+			`C:\Program Files\Microsoft Visual Studio\2022\Community\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe`,
+			`C:\Program Files\Microsoft Visual Studio\2022\Professional\Common7\IDE\CommonExtensions\Microsoft\CMake\CMake\bin\cmake.exe`,
+		} {
+			if exists(path) {
+				return path
+			}
+		}
+	}
+	return ""
 }
 
-func setupPython() string {
-	logf("== Python setup ==")
-	if !exists(venvPython()) {
-		logf("Creating virtual environment in %s", venvDir)
-		p, pre := systemPython()
-		if err := run(root, nil, p, append(pre, "-m", "venv", venvDir)...); err != nil {
-			die("venv creation failed: %v", err)
-		}
+func setupNative() {
+	cmake := findCMake()
+	if cmake == "" {
+		die("CMake was not found. Install CMake and a C++17 compiler.")
 	}
-	py := venvPython()
-	if err := run(root, nil, py, "-m", "pip", "install", "--quiet", "--upgrade", "pip", "setuptools", "wheel"); err != nil {
-		die("pip upgrade failed: %v", err)
+	logf("== Native C++ build ==")
+	if err := run(root, nil, cmake, "-S", filepath.Join(root, "RaspberryPi", "Native"),
+		"-B", nativeBuild); err != nil {
+		die("CMake configure failed: %v", err)
 	}
-	req := filepath.Join(setupDir, "requirements.txt")
-	if exists(req) {
-		if err := run(root, nil, py, "-m", "pip", "install", "--quiet", "-r", req); err != nil {
-			die("pip install failed: %v", err)
-		}
+	if err := run(root, nil, cmake, "--build", nativeBuild, "--config", "Release"); err != nil {
+		die("Native build failed: %v", err)
 	}
-	logf("Python environment ready: %s", py)
-	return py
+	if isWin {
+		nativeExe = filepath.Join(nativeBuild, "Release", "stms-native.exe")
+	} else {
+		nativeExe = filepath.Join(nativeBuild, "stms-native")
+	}
+	if !exists(nativeExe) {
+		die("Native executable was not produced at %s", nativeExe)
+	}
 }
 
-func runScript(name string) int {
-	py := venvPython()
-	if !exists(py) {
-		py = setupPython()
+func runNative(name string) int {
+	if name == "jetson" {
+		return runJetson()
 	}
-	parts := scripts[name]
-	args := append([]string{filepath.Join(root, filepath.FromSlash(parts[0]))}, parts[1:]...)
-	if err := run(root, nil, py, args...); err != nil {
+	executable := nativeExe
+	if !exists(executable) {
+		setupNative()
+		executable = nativeExe
+	}
+	args := []string{name, "--root", root}
+	if name == "receive-jetson" {
+		args = append(args, "--output", filepath.Join(root, "jetson_data.jsonl"))
+		if port := os.Getenv("STMS_JETSON_PORT"); port != "" {
+			args = append(args, "--port", port)
+		}
+	}
+	if name == "receive-bluetooth" {
+		args = append(args, "--output", filepath.Join(root, "arduino_data.jsonl"))
+		if port := os.Getenv("STMS_SENSOR_PORT"); port != "" {
+			args = append(args, "--port", port)
+		}
+	}
+	if err := run(root, nil, executable, args...); err != nil {
 		if ee, ok := err.(*exec.ExitError); ok {
 			return ee.ExitCode()
 		}
+		return 1
+	}
+	return 0
+}
+
+func runJetson() int {
+	executable := filepath.Join(root, "Jetson", "Cameras_nvidia_cuda", "build", "stms-jetson-cameras")
+	config := os.Getenv("STMS_DEEPSTREAM_CONFIG")
+	piHost := os.Getenv("STMS_PI_HOST")
+	if isWin {
+		executable += ".exe"
+	}
+	if !exists(executable) {
+		fmt.Fprintf(os.Stderr, "Jetson camera target not found at %s. Build it on the Jetson with CMake.\n", executable)
+		return 1
+	}
+	if config == "" {
+		fmt.Fprintln(os.Stderr, "Set STMS_DEEPSTREAM_CONFIG to the DeepStream nvinfer configuration file.")
+		return 1
+	}
+	args := []string{"--config", config}
+	if piHost != "" {
+		args = append(args, "--pi", piHost)
+	}
+	if port := os.Getenv("STMS_PI_PORT"); port != "" {
+		args = append(args, "--port", port)
+	}
+	if err := run(root, nil, executable, args...); err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			return ee.ExitCode()
+		}
+		fmt.Fprintln(os.Stderr, err)
+		return 1
+	}
+	return 0
+}
+
+func runScript(name string) int {
+	parts := scripts[name]
+	python := filepath.Join(root, "PythonSetup", ".venv", "Scripts", "python.exe")
+	if !isWin {
+		python = filepath.Join(root, "PythonSetup", ".venv", "bin", "python")
+	}
+	if !exists(python) {
+		for _, candidate := range []string{"python3", "python", "py"} {
+			if path, err := exec.LookPath(candidate); err == nil {
+				python = path
+				break
+			}
+		}
+	}
+	if !exists(python) {
+		if _, err := exec.LookPath(python); err != nil {
+			fmt.Fprintln(os.Stderr, "Python is required for this optional integration. Install its dependencies from PythonSetup/requirements.txt.")
+			return 1
+		}
+	}
+	args := []string{}
+	if filepath.Base(python) == "py" {
+		args = append(args, "-3")
+	}
+	args = append(args, filepath.Join(root, filepath.FromSlash(parts[0])))
+	args = append(args, parts[1:]...)
+	if err := run(root, nil, python, args...); err != nil {
+		if ee, ok := err.(*exec.ExitError); ok {
+			return ee.ExitCode()
+		}
+		fmt.Fprintln(os.Stderr, err)
 		return 1
 	}
 	return 0
@@ -356,21 +436,28 @@ func status() {
 
 func main() {
 	root = findRoot()
-	setupDir = filepath.Join(root, "PythonSetup")
-	venvDir = filepath.Join(setupDir, ".venv")
+	nativeBuild = filepath.Join(root, "build", "native")
+	if isWin {
+		nativeExe = filepath.Join(nativeBuild, "Release", "stms-native.exe")
+		if !exists(nativeExe) {
+			nativeExe = filepath.Join(nativeBuild, "stms-native.exe")
+		}
+	} else {
+		nativeExe = filepath.Join(nativeBuild, "stms-native")
+	}
 	mobile := filepath.Join(root, "MobileApp")
 	backendDir = filepath.Join(mobile, "backend", "node-express")
 	frontendDir = filepath.Join(mobile, "frontend")
 	logsDir = filepath.Join(mobile, "logs")
 	pidFile = filepath.Join(logsDir, "pids.json")
 
-	command, skipPython := "start", false
+	command, skipNative := "start", false
 	for _, a := range os.Args[1:] {
 		switch a {
-		case "--skip-python", "-skip-python":
-			skipPython = true
+		case "--skip-native", "-skip-native", "--skip-python", "-skip-python":
+			skipNative = true
 		case "-h", "--help", "help":
-			fmt.Println("Usage: launch-stms [start|stop|status|setup|route|traffic|train|cloud|jetson|all] [--skip-python]")
+			fmt.Println("Usage: launch-stms [start|stop|status|setup|route|traffic|train|send-route|receive-jetson|receive-bluetooth|jetson|cloud|all] [--skip-native]")
 			return
 		default:
 			command = a
@@ -379,8 +466,8 @@ func main() {
 
 	switch command {
 	case "start":
-		if !skipPython {
-			setupPython()
+		if !skipNative {
+			setupNative()
 		}
 		startMobile()
 	case "stop":
@@ -388,15 +475,27 @@ func main() {
 	case "status":
 		status()
 	case "setup":
-		setupPython()
+		setupNative()
 	case "all":
-		setupPython()
+		setupNative()
 		for _, step := range []string{"route", "traffic", "cloud"} {
-			if code := runScript(step); code != 0 {
+			var code int
+			if nativeCommands[step] {
+				code = runNative(step)
+			} else {
+				code = runScript(step)
+			}
+			if code != 0 {
 				os.Exit(code)
 			}
 		}
 	default:
+		if nativeCommands[command] {
+			os.Exit(runNative(command))
+		}
+		if command == "jetson" {
+			os.Exit(runJetson())
+		}
 		if _, ok := scripts[command]; !ok {
 			die("Unknown command %q. Use: start|stop|status|setup|route|traffic|train|cloud|jetson|all", command)
 		}

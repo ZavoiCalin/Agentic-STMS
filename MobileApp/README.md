@@ -7,7 +7,7 @@ This folder contains the generated mobile frontend and backend examples for the 
 - `frontend/` – React Native mobile app
 - `backend/node-express/` – Node.js API example
 - `backend/python-fastapi/` – Python API example
-- `backend/raspberry-pi/` – Raspberry Pi sender script
+- Raspberry Pi route sender – native C++ command in `RaspberryPi/Native/` (`launch-stms send-route`)
 - `backend/database/` – route storage SQL schema
 - `backend/azure-function/` – Azure IoT Hub and Blob Storage example flow
 - `docs/` – architecture, comparison, and deployment notes

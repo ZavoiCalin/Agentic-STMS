@@ -12,3 +12,4 @@ logs/
 *.err
 root.json
 bin/
+build/

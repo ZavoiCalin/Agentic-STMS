@@ -14,22 +14,22 @@ The project has been reorganized to reflect this active architecture. The implem
 - Jetson layer for computer-vision-based traffic analytics and vehicle flow detection
 - STM32 layer for embedded sensor acquisition, telemetry, and traffic analytics logic
 - Azure IoT Hub and Azure Blob Storage for cloud message flow and persistence
-- Python local tooling for development validation and route simulation in the current environment
+- Native C++ Raspberry Pi route and telemetry processing, with optional Python cloud adapters
 
 The older simulated Azure IoT Hub + MongoDB architecture remains part of the historical background of the project and is retained only as a reference for legacy design comparison. MongoDB is treated as compatibility-only infrastructure rather than the active persistence choice. The Arduino implementation is no longer considered part of the current runtime architecture and has been removed from the active project structure.
 
 ## Current maturity
 
-The project is in an active development state with a clear architectural direction and a working local validation path. The Python-based route logic is successfully executable in the current environment using a dedicated virtual environment and the cross-platform Go launcher. This ensures the project remains runnable without full cloud or hardware dependencies while the embedded and deployment layers are being developed.
+The project is in active development with a native C++ Raspberry Pi route and telemetry path. The Go launcher dispatches route, traffic, and receiver commands to the native executable. Azure/Blob/Mongo compatibility tooling remains Python-based and optional pending native SDK migration.
 
-The embedded STM32 path has been migrated to a CubeIDE-style project structure aligned with the NUCLEO-N657X0-Q target. This includes the sensor-node logic, board configuration, traffic analytics logic, and UART/Bluetooth-oriented telemetry format intended to match the hardware-first system design. The project is structurally complete for import into STM32CubeIDE, but final board-specific validation, pin mapping confirmation, and firmware build/test remain dependent on the real hardware toolchain.
+STM32 application, sensor acquisition, and analytics sources are C++. CubeIDE-style interrupt/startup C and assembly remain. The repository only contains a HAL compatibility stub, not the vendor implementation or a complete CubeIDE project, so producing flashable firmware and board-level validation require the generated NUCLEO-N657X0-Q project and physical hardware.
 
 ## Technical direction
 
 The current project direction is best described as a hybrid edge AI and cloud-enabled traffic management system with emphasis on:
 
-- real-time route optimization using traffic and environmental inputs
-- camera-based vehicle counting and congestion detection on Jetson hardware
+- real-time route optimization using Jetson detections and environmental inputs
+- CUDA-backed camera inference on Jetson hardware
 - distributed sensing and embedded analytics on STM32 hardware
 - central orchestration on Raspberry Pi 5
 - optional Azure-based cloud communication and blob-backed persistence

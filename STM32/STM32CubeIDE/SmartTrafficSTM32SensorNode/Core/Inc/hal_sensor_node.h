@@ -13,6 +13,10 @@ typedef struct {
     uint16_t dht_pin;
 } stm32_sensor_node_t;
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 void stm32_sensor_node_init(stm32_sensor_node_t *node,
                            ADC_HandleTypeDef *hadc_co,
                            ADC_HandleTypeDef *hadc_rain,
@@ -25,5 +29,9 @@ float stm32_measure_distance_cm(GPIO_TypeDef *trig_port,
                                GPIO_TypeDef *echo_port,
                                uint16_t echo_pin,
                                TIM_HandleTypeDef *htim);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

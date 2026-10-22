@@ -8,6 +8,8 @@
 
 #include <stdint.h>
 
+#define DISABLE 0U
+#define ENABLE 1U
 #define GPIO_PIN_RESET 0U
 #define GPIO_PIN_SET 1U
 #define GPIO_MODE_INPUT 0U
@@ -37,13 +39,26 @@
 #define GPIOC ((GPIO_TypeDef *)0x3)
 #define ADC1 ((ADC_TypeDef *)0x11)
 #define ADC2 ((ADC_TypeDef *)0x12)
-#define USART2 ((UART_HandleTypeDef *)0x21)
-#define TIM1 ((TIM_HandleTypeDef *)0x31)
+#define USART2 ((USART_TypeDef *)0x21)
+#define TIM1 ((TIM_TypeDef *)0x31)
 
 typedef struct GPIO_TypeDef { uint32_t dummy; } GPIO_TypeDef;
 typedef struct ADC_TypeDef { uint32_t dummy; } ADC_TypeDef;
-typedef struct UART_HandleTypeDef { uint32_t dummy; } UART_HandleTypeDef;
-typedef struct TIM_HandleTypeDef { uint32_t dummy; } TIM_HandleTypeDef;
+typedef struct USART_TypeDef { uint32_t dummy; } USART_TypeDef;
+typedef struct TIM_TypeDef { uint32_t dummy; } TIM_TypeDef;
+typedef struct ADC_InitTypeDef {
+    uint32_t ClockPrescaler, Resolution, ScanConvMode, EOCSelection;
+    uint32_t ContinuousConvMode, DataAlign, NbrOfConversion;
+} ADC_InitTypeDef;
+typedef struct UART_InitTypeDef {
+    uint32_t BaudRate, WordLength, StopBits, Parity, Mode, HwFlowCtl, OverSampling;
+} UART_InitTypeDef;
+typedef struct TIM_Base_InitTypeDef {
+    uint32_t Prescaler, CounterMode, Period, ClockDivision, RepetitionCounter;
+} TIM_Base_InitTypeDef;
+typedef struct ADC_HandleTypeDef { ADC_TypeDef *Instance; ADC_InitTypeDef Init; } ADC_HandleTypeDef;
+typedef struct UART_HandleTypeDef { USART_TypeDef *Instance; UART_InitTypeDef Init; } UART_HandleTypeDef;
+typedef struct TIM_HandleTypeDef { TIM_TypeDef *Instance; TIM_Base_InitTypeDef Init; } TIM_HandleTypeDef;
 typedef struct ADC_ChannelConfTypeDef { uint32_t Channel; uint32_t Rank; uint32_t SamplingTime; uint32_t OffsetNumber; } ADC_ChannelConfTypeDef;
 typedef struct GPIO_InitTypeDef { uint32_t Pin; uint32_t Mode; uint32_t Pull; uint32_t Speed; } GPIO_InitTypeDef;
 
@@ -76,21 +91,27 @@ typedef struct GPIO_InitTypeDef { uint32_t Pin; uint32_t Mode; uint32_t Pull; ui
 #define GPIO_PIN_10 0x0400U
 #define GPIO_PIN_11 0x0800U
 
+#ifdef __cplusplus
+extern "C" {
+#endif
 void HAL_Init(void);
 void HAL_Delay(uint32_t ms);
 uint32_t HAL_GetTick(void);
 void HAL_GPIO_WritePin(GPIO_TypeDef *port, uint16_t pin, uint8_t value);
 uint8_t HAL_GPIO_ReadPin(GPIO_TypeDef *port, uint16_t pin);
 void HAL_GPIO_Init(GPIO_TypeDef *port, GPIO_InitTypeDef *init);
-void HAL_ADC_Init(ADC_TypeDef *hadc);
-void HAL_ADC_ConfigChannel(ADC_TypeDef *hadc, ADC_ChannelConfTypeDef *config);
-void HAL_ADC_Start(ADC_TypeDef *hadc);
-void HAL_ADC_Stop(ADC_TypeDef *hadc);
-void HAL_ADC_PollForConversion(ADC_TypeDef *hadc, uint32_t timeout);
-uint32_t HAL_ADC_GetValue(ADC_TypeDef *hadc);
+void HAL_ADC_Init(ADC_HandleTypeDef *hadc);
+void HAL_ADC_ConfigChannel(ADC_HandleTypeDef *hadc, ADC_ChannelConfTypeDef *config);
+void HAL_ADC_Start(ADC_HandleTypeDef *hadc);
+void HAL_ADC_Stop(ADC_HandleTypeDef *hadc);
+void HAL_ADC_PollForConversion(ADC_HandleTypeDef *hadc, uint32_t timeout);
+uint32_t HAL_ADC_GetValue(ADC_HandleTypeDef *hadc);
 void HAL_UART_Init(UART_HandleTypeDef *huart);
 void HAL_UART_Transmit(UART_HandleTypeDef *huart, uint8_t *pData, uint16_t Size, uint32_t Timeout);
 void HAL_TIM_Base_Init(TIM_HandleTypeDef *htim);
 void HAL_IncTick(void);
+#ifdef __cplusplus
+}
+#endif
 
 #endif
