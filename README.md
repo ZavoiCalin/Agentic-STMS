@@ -98,7 +98,7 @@ cd Launcher && go build -ldflags "-s -w" -o ../bin/launch-stms . && cd ..
 ./bin/launch-stms
 ```
 
-`Launcher/` contains the cross-platform launcher (Go, standard library only). It builds to one native executable for Windows, Linux, macOS and Raspberry Pi. The C++ tools use CMake, a C++17 compiler, and nlohmann/json (vendored in `RaspberryPi/Native/third_party`, so the build is fully offline). Python remains required only for the optional, not-yet-migrated cloud commands.
+`Launcher/` contains the cross-platform launcher (Go, standard library only). It builds to one native executable for Windows, Linux, macOS and Raspberry Pi. The C++ tools use CMake, a C++17 compiler, and nlohmann/json (uses the system package `nlohmann-json3-dev` if installed, otherwise CMake downloads a pinned, SHA256-verified release on first configure). Python remains required only for the optional, not-yet-migrated cloud commands.
 
 **Build** (needs [Go](https://go.dev/dl/) 1.21+, CMake and a C++17 compiler; generated output goes to `bin/` and `build/`)
 
