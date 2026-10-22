@@ -10,6 +10,7 @@ logs/
 **/.expo/
 *.log
 *.err
+.venv/
 root.json
 bin/
 build/

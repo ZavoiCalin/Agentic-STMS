@@ -1,5 +1,7 @@
 # Smart Traffic Management System
 
+This project is an AI agent enhanced version of the project. Its development and optimisation is heavily based on AI agent orchestraction using Copilot and Visual Studio Code.
+
 This workspace is organized around the active project structure and a small set of reference archives. The Arduino prototype is archived and unused root-level launch files were removed, while the functional project areas remain separated by role.
 
 ## Active project areas

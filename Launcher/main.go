@@ -118,12 +118,35 @@ func findCMake() string {
 	return ""
 }
 
+// A cache created from a developer prompt pins the NMake/Ninja generator, which fails
+// in a normal shell where those tools are not on PATH; drop it so CMake picks a default.
+func resetStaleCache() {
+	data, err := os.ReadFile(filepath.Join(nativeBuild, "CMakeCache.txt"))
+	if err != nil {
+		return
+	}
+	for _, line := range strings.Split(string(data), "\n") {
+		if !strings.HasPrefix(line, "CMAKE_GENERATOR:INTERNAL=") {
+			continue
+		}
+		gen := strings.TrimSpace(strings.TrimPrefix(line, "CMAKE_GENERATOR:INTERNAL="))
+		tool := map[string]string{"NMake Makefiles": "nmake", "Ninja": "ninja"}[gen]
+		if tool != "" {
+			if _, err := exec.LookPath(tool); err != nil {
+				logf("Discarding CMake cache generated with %s (%s not on PATH)", gen, tool)
+				os.RemoveAll(nativeBuild)
+			}
+		}
+	}
+}
+
 func setupNative() {
 	cmake := findCMake()
 	if cmake == "" {
 		die("CMake was not found. Install CMake and a C++17 compiler.")
 	}
 	logf("== Native C++ build ==")
+	resetStaleCache()
 	if err := run(root, nil, cmake, "-S", filepath.Join(root, "RaspberryPi", "Native"),
 		"-B", nativeBuild); err != nil {
 		die("CMake configure failed: %v", err)
