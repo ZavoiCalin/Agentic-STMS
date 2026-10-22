@@ -1,5 +1,6 @@
 #include "hal_sensor_node.h"
 #include "traffic_analytics.h"
+#include "mics6814.h"
 
 #include <string.h>
 
@@ -96,7 +97,7 @@ static void MX_USART2_UART_Init(void)
     __HAL_RCC_USART2_CLK_ENABLE();
 
     huart2.Instance = USART2;
-    huart2.Init.BaudRate = 115200;
+    huart2.Init.BaudRate = 9600; /* matches the HC-05/06 default, as in the Arduino sketch */
     huart2.Init.WordLength = UART_WORDLENGTH_8B;
     huart2.Init.StopBits = UART_STOPBITS_1;
     huart2.Init.Parity = UART_PARITY_NONE;
@@ -138,30 +139,29 @@ int main(void)
     HAL_Init();
     SystemClock_Config();
     MX_GPIO_Init();
+    mics6814_gpio_init();
     MX_ADC_Init();
     MX_USART2_UART_Init();
     MX_TIM1_Init();
 
     stm32_sensor_node_t sensor_node;
-    sensor_sample_t sample;
     traffic_analytics_t analytics;
     traffic_decision_t decision;
     lane_sample_t lanes[TRAFFIC_LANE_COUNT];
-    char sensor_json[SENSOR_NODE_JSON_SIZE];
+    char mics_json[MICS_JSON_SIZE];
 
     stm32_sensor_node_init(&sensor_node, &hadc1, &hadc2, &huart2, &htim1);
     traffic_analytics_init(&analytics);
 
     for (;;) {
-        stm32_sensor_node_read_sample(&sensor_node, &sample);
-        sensor_node_format_json(&sample, sensor_json, sizeof(sensor_json));
+        mics6814_read_json(&hadc1, mics_json, sizeof(mics_json));
 
         build_lane_samples(lanes);
         traffic_analytics_update(&analytics, lanes, TRAFFIC_LANE_COUNT);
         decision = traffic_analytics_evaluate(&analytics);
         traffic_analytics_print_state(&decision);
 
-        stm32_sensor_node_send_json(&sensor_node, sensor_json);
-        HAL_Delay(1100U);
+        mics6814_send(&huart2, mics_json);
+        HAL_Delay(1000U);
     }
 }

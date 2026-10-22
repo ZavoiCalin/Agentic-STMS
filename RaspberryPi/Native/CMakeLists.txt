@@ -19,6 +19,12 @@ if(WIN32)
     target_link_libraries(stms-native PRIVATE winhttp ws2_32)
 endif()
 
+if(UNIX)
+    add_executable(bluetooth-receiver ../ReceiveData/bluetooth_receiver.cpp)
+    target_compile_features(bluetooth-receiver PRIVATE cxx_std_17)
+    target_compile_options(bluetooth-receiver PRIVATE -Wall -Wextra -Wpedantic)
+endif()
+
 if(MSVC)
     target_compile_options(stms-native PRIVATE /W4 /permissive-)
 else()
