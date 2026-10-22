@@ -1,5 +1,5 @@
 Param(
-    [ValidateSet("route", "traffic", "train", "cloud", "jetson", "all", "help")]
+    [ValidateSet("route", "traffic", "train", "cloud", "jetson", "all", "setup", "help")]
     [string]$Command = "help"
 )
 
@@ -70,6 +70,7 @@ switch ($Command) {
     "train" { Run-Train }
     "cloud" { Run-Cloud }
     "jetson" { Run-Jetson }
+    "setup" { Write-Host "Python environment ready: $pythonExe" }
     "all" {
         Run-Route
         Run-Traffic

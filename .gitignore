@@ -1,6 +1,5 @@
 
 SimulatedDevicesPrototype/
-q_table.npy
 *.pyc
 **/*.pyc
 node_modules/
@@ -11,3 +10,4 @@ logs/
 **/.expo/
 *.log
 *.err
+root.json
