@@ -8,8 +8,10 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
+#include <algorithm>
 #include <atomic>
 #include <array>
+#include <cctype>
 #include <csignal>
 #include <condition_variable>
 #include <cstdint>
@@ -24,6 +26,7 @@
 #include <sstream>
 #include <string>
 #include <thread>
+#include <unordered_set>
 
 namespace {
 
@@ -35,6 +38,18 @@ std::atomic<gint64> last_fps_report_us{0};
 std::mutex telemetry_mutex;
 std::condition_variable telemetry_ready;
 std::deque<std::string> telemetry_queue;
+constexpr double intersection_latitude = 45.7489;
+constexpr double intersection_longitude = 21.2087;
+
+bool is_vehicle(const NvDsObjectMeta& object) {
+    std::string label(object.obj_label);
+    std::transform(label.begin(), label.end(), label.begin(), [](unsigned char character) {
+        return static_cast<char>(std::tolower(character));
+    });
+    return label == "car" || label == "truck" || label == "bus" ||
+           label == "motorcycle" || label == "motorbike" || label == "van" ||
+           label == "vehicle";
+}
 
 struct Options {
     std::string config;
@@ -138,11 +153,11 @@ bool parse_options(int argc, char** argv, Options& options) {
         std::cerr << "Inference config must select TensorRT FP16 (network-mode=2) or calibrated INT8 (network-mode=1).\n";
         return false;
     }
-    std::cout << "Using two-camera TensorRT inference and GPU NvDCF tracking.\n";
+    std::cout << "Using two-camera TensorRT vehicle detection and GPU NvDCF tracking.\n";
     return true;
 }
 
-bool queue_counts(guint frame_number, guint camera_id, guint count, guint tracked_count) {
+bool queue_counts(guint camera_id, guint vehicle_count) {
     if (camera_id >= last_send_us.size()) return false;
     const gint64 now_us = g_get_monotonic_time();
     gint64 previous = last_send_us[camera_id].load();
@@ -155,12 +170,10 @@ bool queue_counts(guint frame_number, guint camera_id, guint count, guint tracke
     const std::time_t now = std::time(nullptr);
     std::tm utc{};
     gmtime_r(&now, &utc);
-    payload << "{\"camera_id\":\"Cam" << camera_id + 1
-            << "\",\"intersection\":\"Intersection " << static_cast<char>('A' + camera_id)
-            << "\",\"frame_number\":" << frame_number
-            << ",\"object_count\":" << count
-            << ",\"tracked_object_count\":" << tracked_count
-            << ",\"timestamp\":\"" << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ") << "\"}";
+    payload << "{\"timestamp\":\"" << std::put_time(&utc, "%Y-%m-%dT%H:%M:%SZ")
+            << "\",\"intersection_coordinates\":{\"latitude\":" << intersection_latitude
+            << ",\"longitude\":" << intersection_longitude
+            << "},\"vehicle_count\":" << vehicle_count << "}";
     {
         std::lock_guard<std::mutex> lock(telemetry_mutex);
         if (telemetry_queue.size() >= 32) {
@@ -245,16 +258,19 @@ GstPadProbeReturn metadata_probe(GstPad*, GstPadProbeInfo* info, gpointer user_d
         if (frame == nullptr) continue;
         if (frame->source_id >= frames_per_camera.size()) continue;
         frames_per_camera[frame->source_id].fetch_add(1, std::memory_order_relaxed);
-        const guint count = frame->num_obj_meta;
-        guint tracked_count = 0;
+        guint vehicle_count = 0;
+        std::unordered_set<guint64> tracked_vehicle_ids;
         for (NvDsMetaList* object_node = frame->obj_meta_list;
              object_node != nullptr; object_node = object_node->next) {
             const auto* object = static_cast<const NvDsObjectMeta*>(object_node->data);
-            if (object != nullptr && object->object_id != UNTRACKED_OBJECT_ID) {
-                ++tracked_count;
+            if (object != nullptr && is_vehicle(*object)) {
+                if (object->object_id == UNTRACKED_OBJECT_ID ||
+                    tracked_vehicle_ids.insert(object->object_id).second) {
+                    ++vehicle_count;
+                }
             }
         }
-        queue_counts(frame->frame_num, frame->source_id, count, tracked_count);
+        queue_counts(frame->source_id, vehicle_count);
     }
 
     const gint64 now_us = g_get_monotonic_time();
@@ -267,7 +283,7 @@ GstPadProbeReturn metadata_probe(GstPad*, GstPadProbeInfo* info, gpointer user_d
         std::lock_guard<std::mutex> lock(output_mutex);
         for (std::size_t camera = 0; camera < frames_per_camera.size(); ++camera) {
             const auto frames = frames_per_camera[camera].exchange(0, std::memory_order_relaxed);
-            std::cout << "Camera " << camera + 1 << " inference/tracker FPS: "
+            std::cout << "Camera " << camera + 1 << " inference FPS: "
                       << static_cast<double>(frames) / elapsed << '\n';
         }
     }

@@ -212,7 +212,7 @@ func runJetson() int {
 	}
 	trackerConfig := os.Getenv("STMS_TRACKER_CONFIG")
 	if trackerConfig == "" {
-		fmt.Fprintln(os.Stderr, "Set STMS_TRACKER_CONFIG to the DeepStream NvDCF performance tracker configuration.")
+		fmt.Fprintln(os.Stderr, "Set STMS_TRACKER_CONFIG to the DeepStream NvDCF tracker configuration file.")
 		return 1
 	}
 	args := []string{"--config", config, "--tracker-config", trackerConfig}

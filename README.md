@@ -24,7 +24,7 @@ The following is intentionally kept as reference or archived material, not as th
 The current design in this workspace is centered on the following flow:
 
 - Raspberry Pi 5: native C++ route/traffic tools and TCP/Bluetooth-UART telemetry receivers that consume Jetson and sensor readings
-- NVIDIA Jetson: native C++ GStreamer/DeepStream CUDA/TensorRT inference on exactly two CSI-connected Raspberry Pi Camera Module v2 cameras, with Jetson NVMM/Argus capture, batched GPU inference, and GPU NvDCF object tracking
+- NVIDIA Jetson: native C++ GStreamer/DeepStream CUDA/TensorRT vehicle detection and GPU NvDCF tracking on exactly two CSI-connected Raspberry Pi Camera Module v2 cameras, with Jetson NVMM/Argus capture and batched GPU inference; sends only timestamp, intersection coordinates, and vehicle count to the Pi
 - STM32 sensor node (NUCLEO-N657X0-Q): C++ application and analytics with CubeIDE/HAL startup, interrupt, and HAL glue retained in C/assembly
 - Azure IoT Hub / Azure Blob Storage: optional cloud integration and persistence for the edge pipeline
 - Mobile application: existing Node.js/Express backend and React Native frontend
@@ -53,8 +53,14 @@ cmake -S RaspberryPi/Native -B build/native -DCMAKE_BUILD_TYPE=Release
 cmake --build build/native --parallel
 ```
 
-The Pi native target vendors its JSON header, so configuring and rebuilding it
-does not fetch dependencies from the host PC or the network. After changing
+The Pi native target no longer vendors its JSON header: CMake uses the system
+`nlohmann-json3-dev` package if installed (`sudo apt install -y nlohmann-json3-dev`),
+otherwise it downloads a pinned, SHA256-verified nlohmann/json release on first
+configure, so the first configure needs network access on the Pi. On Unix the same
+configure also builds `bluetooth-receiver`
+(`RaspberryPi/ReceiveData/bluetooth_receiver.cpp`), which reads the STM32
+MICS-6814 air-quality JSON lines sent through an HC-05 on `/dev/rfcomm0`;
+pairing steps are in the source header. After changing
 native source, rerun `cmake --build build/native --parallel`; CMake rebuilds
 the target on the Pi. To build and test the Go launcher on the Pi, install Go
 1.21+ and run `cd Launcher && go test ./... && mkdir -p ../bin && go build -o ../bin/launch-stms .`.
@@ -71,7 +77,7 @@ cmake --build Jetson/Cameras_nvidia_cuda/build --parallel
 ```
 
 The runtime test requires the Jetson hardware, its two connected CSI cameras,
-and the DeepStream inference/tracker configuration; see the [Jetson runtime
+and DeepStream inference/tracker configurations; see the [Jetson runtime
 guide](Jetson/Cameras_nvidia_cuda/Jetson_Stream_TensorRT/dual_stream_tensorrt_doc.md).
 The Jetson camera target cannot be built or meaningfully tested by building
 its executable on this Windows host.
@@ -134,17 +140,19 @@ cd Launcher && go build -ldflags "-s -w" -o ../bin/launch-stms . && cd ..
 The receiver defaults to TCP port `5000` and `/dev/rfcomm0` on Linux
 (`COM3` on Windows). Override these with `STMS_JETSON_PORT` and
 `STMS_SENSOR_PORT`. The route starts with the road-network weights and adjusts
-outgoing costs at observed intersections using the latest Jetson detection
-tracked-object count (falling back to detection count) and available
+outgoing costs at observed intersections using the latest Jetson vehicle count
+and available
 speed/weather/sensor readings.
 
 For the camera-to-route flow, start `launch-stms receive-jetson` on the Pi, then
 run the Jetson binary with `STMS_PI_HOST`, `STMS_DEEPSTREAM_CONFIG`, and
 `STMS_TRACKER_CONFIG` set. The Pi
 persists incoming JSONL and recalculates `optimal_route_results.json` for each
-new valid camera report. The Jetson pipeline is configured for exactly two
-Raspberry Pi Camera Module v2 CSI sensors, IDs 0 and 1. `Cam1`/`Cam2` map to
-Intersections A/B unless the event includes an explicit `intersection`.
+new valid camera report. Each report contains only `timestamp`,
+`intersection_coordinates` and `vehicle_count`. Both cameras currently use
+Timișoara coordinates (45.7489, 21.2087), which map to Intersection A. The
+Jetson pipeline is configured for exactly two Raspberry Pi Camera Module v2
+CSI sensors, IDs 0 and 1.
 Set `STMS_JETSON_HEADLESS=1` when using the launcher without a display; this
 bypasses OSD and avoids unnecessary GPU work.
 
