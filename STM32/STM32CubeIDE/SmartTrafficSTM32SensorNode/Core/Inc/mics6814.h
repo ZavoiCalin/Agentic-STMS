@@ -17,15 +17,14 @@
    Set this to (R1+R2)/R2 (e.g. 1.5 for 10k/20k), or 1.0 if no divider. */
 #define MICS_DIVIDER_RATIO 1.5f
 
-#define MICS_JSON_SIZE 96
+#define MICS_JSON_SIZE 128
 
 #ifdef __cplusplus
 extern "C" {
 #endif
 
 void mics6814_gpio_init(void);
-/* Reads CO/NH3/NO2 (ppm, same approximation as the Arduino sketch) and writes
-   {"co":x.xx,"nh3":x.xx,"no2":x.xx}\n into buf. */
+/* Reads the three analog outputs and writes one JSON-lines record. */
 void mics6814_read_json(ADC_HandleTypeDef *hadc, char *buf, size_t buf_size);
 void mics6814_send(UART_HandleTypeDef *huart, const char *json);
 

@@ -9,8 +9,12 @@ typedef struct {
     ADC_HandleTypeDef *hadc_rain;
     UART_HandleTypeDef *huart;
     TIM_HandleTypeDef *htim_ultrasonic;
-    GPIO_TypeDef *dht_port;
-    uint16_t dht_pin;
+    uint32_t first_vehicle_sensor_ms;
+    uint32_t detection_threshold_cm;
+    float sensor_distance_m;
+    float last_speed_mps;
+    uint8_t last_detected_sensors;
+    uint8_t first_vehicle_sensor;
 } stm32_sensor_node_t;
 
 #ifdef __cplusplus

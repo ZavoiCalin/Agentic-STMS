@@ -1,56 +1,40 @@
 # SmartTrafficSTM32SensorNode
 
-This folder is a CubeIDE-style sensor-node skeleton. The application entry point, sensor model, HAL-facing sensor acquisition, and traffic analytics are C++; CubeIDE-style interrupt handlers and startup code remain C/assembly, as is normal for generated STM32 projects.
+This folder is a CubeIDE-style sensor-node skeleton. The active application reads the three analog outputs of a MICS6814 and sends them over Bluetooth UART. Other sensor and traffic-analytics sources are retained for separate development but are not used by the active main loop.
 
 ## Purpose
 
-The firmware reads the same sensor inputs that the legacy Arduino sketch used:
+The active firmware reads:
 
-- CO analog sensor
-- DHT temperature and humidity
-- rain sensor (analog + digital)
-- speed estimation using two HC-SR04 ultrasonic sensors
-
-It also includes the traffic analytics engine used to classify lane congestion, determine the dominant lane, and build the MQTT-style payload that the Raspberry Pi can consume.
+- MICS6814 CO, NH3, and NO2 analog outputs
 
 ## NUCLEO-N657X0-Q HAL target
 
 This project is now aligned to the STM32 NUCLEO-N657X0-Q board and uses a HAL-style initialization flow for:
 
-- ADC conversion for CO and rain analog inputs
+- ADC conversion for the three MICS6814 analog outputs
 - UART for Bluetooth/UART telemetry to the Raspberry Pi
-- GPIO for rain digital input, DHT signal, and ultrasonic trigger/echo
-- timer-driven ultrasonic distance measurement
 
-## Concrete board mapping used in the HAL skeleton
+## Example pin mapping
 
-This is the current working example mapping for the Nucleo target:
+The current example assumes these analog outputs are connected to ADC1:
 
-- CO analog sensor: PC0 (ADC1/ADC10)
-- Rain analog sensor: PC1 (ADC2/ADC11)
-- Rain digital sensor: PB0
-- DHT11 data: PC7
-- Ultrasonic trigger 1: PA8
-- Ultrasonic echo 1: PA9
-- Ultrasonic trigger 2: PA10
-- Ultrasonic echo 2: PA11
+- CO analog output: PC0 (ADC channel 10)
+- NH3 analog output: PC2 (ADC channel 12)
+- NO2 analog output: PC3 (ADC channel 13)
 - Bluetooth UART: PA2 / PA3 -> USART2
 
-Adjust the final real pin mapping to the exact wiring harness and connector layout used on your board.
+Verify these pins against the board variant and wiring. Ensure each sensor output stays within the STM32 ADC input-voltage limit; use a suitable divider if the module can output more than the ADC reference voltage.
 
-## Merged functionality
+The USART2 link uses 9600 baud, 8-N-1. Connect the Bluetooth module's RX to STM32 TX and its TX to STM32 RX, with a shared ground and compatible logic levels.
 
-- sensor acquisition and JSON telemetry via Bluetooth/UART
-- queue estimation and congestion scoring
-- traffic-state classification (FREE, LIGHT, MODERATE, HEAVY, CRITICAL)
-- dominant-lane scheduling decision
-- MQTT payload generation compatible with the edge-gateway design
+## Telemetry
 
-## Expected serial payload format
+One JSON line is sent per second:
 
-{"co":410,"temperature":22.0,"humidity":43.0,"average_speed":0.20,"rainAnalog":435,"rainDigital":0}
+{"co":1.23,"nh3":2.34,"no2":0.56}
 
-This JSON-lines format is compatible with the native Raspberry Pi `receive-bluetooth` receiver, which writes `arduino_data.jsonl` at the project root for route calculations.
+The JSON-lines format matches the native Raspberry Pi Bluetooth receiver. The source currently uses provisional voltage-to-concentration scaling; these values are not calibrated ppm readings. Calibrate each sensor channel with the actual module/load resistors and the sensor's baseline before using the values as gas concentrations.
 
 ## Generated-style layout
 
@@ -71,4 +55,4 @@ This JSON-lines format is compatible with the native Raspberry Pi `receive-bluet
 - Drivers/CMSIS/Device/ST/STM32N6xx/Include/system_stm32n6xx.h
 - Drivers/STM32N6xx_HAL_Driver/Inc/stm32n6xx_hal.h
 
-The Makefile builds the C++ sensor/analytics library. This repository does not include a complete STM32CubeIDE project or the vendor HAL implementation, so it cannot yet produce flashable firmware. Generate/import the full STM32N6 HAL project, include the four C++ application sources, and link the generated C HAL files with C linkage before flashing. `SystemClock_Config`, DHT11 reads, and lane samples remain placeholders and need board configuration and real sensor readings.
+The Makefile builds the C++ sensor/analytics library. This repository does not include a complete STM32CubeIDE project or the vendor HAL implementation, so it cannot yet produce flashable firmware. Generate/import the full STM32N6 HAL project, include the active application and MICS6814 sources, and link the generated C HAL files with C linkage before flashing. The clock setup and ADC/pin mapping must be completed and verified for the exact board. Hardware operation and gas calibration still require on-board validation.

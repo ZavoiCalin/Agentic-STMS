@@ -9,7 +9,6 @@
 
 typedef struct {
     int co_pin;
-    int temp_pin;
     int rain_analog_pin;
     int rain_digital_pin;
     int trig_pin_1;
@@ -22,9 +21,9 @@ typedef struct {
 
 typedef struct {
     int co;
-    float temperature_c;
-    float humidity_pct;
     float average_speed_mps;
+    float distance_1_cm;
+    float distance_2_cm;
     int rain_analog;
     int rain_digital;
     uint32_t timestamp_ms;

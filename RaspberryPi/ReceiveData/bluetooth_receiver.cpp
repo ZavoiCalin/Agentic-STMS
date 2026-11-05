@@ -41,7 +41,7 @@ static int open_port(const char *path)
 static void handle_line(const std::string &line)
 {
     double co = 0, nh3 = 0, no2 = 0;
-    if (std::sscanf(line.c_str(), " {\"co\":%lf,\"nh3\":%lf,\"no2\":%lf}", &co, &nh3, &no2) == 3) {
+    if (std::sscanf(line.c_str(), " {\"co\":%lf,\"nh3\":%lf,\"no2\":%lf", &co, &nh3, &no2) == 3) {
         std::printf("CO=%.2f ppm  NH3=%.2f ppm  NO2=%.2f ppm\n", co, nh3, no2);
     } else {
         std::printf("Bad line: %s\n", line.c_str());

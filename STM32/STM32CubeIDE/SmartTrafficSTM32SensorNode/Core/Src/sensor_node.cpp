@@ -45,7 +45,6 @@ void sensor_node_init(sensor_board_config_t *cfg)
     }
 
     cfg->co_pin = 0;
-    cfg->temp_pin = 2;
     cfg->rain_analog_pin = 1;
     cfg->rain_digital_pin = 3;
     cfg->trig_pin_1 = 5;
@@ -67,9 +66,9 @@ void sensor_node_sample(sensor_sample_t *sample, const sensor_board_config_t *cf
     const float speed_mps = compute_vehicle_speed_mps(distance_1_cm, distance_2_cm, cfg->sensor_distance_m);
 
     sample->co = mock_analog_read(cfg->co_pin);
-    sample->temperature_c = 22.0f + (float)(cfg->temp_pin % 7U) * 0.8f;
-    sample->humidity_pct = 43.0f + (float)(cfg->temp_pin % 9U) * 2.5f;
     sample->average_speed_mps = speed_mps;
+    sample->distance_1_cm = distance_1_cm;
+    sample->distance_2_cm = distance_2_cm;
     sample->rain_analog = mock_analog_read(cfg->rain_analog_pin);
     sample->rain_digital = mock_digital_read(cfg->rain_digital_pin);
     sample->timestamp_ms = 0U;
@@ -83,11 +82,11 @@ void sensor_node_format_json(const sensor_sample_t *sample, char *buffer, size_t
 
     snprintf(buffer,
              buffer_size,
-             "{\"co\":%d,\"temperature\":%.1f,\"humidity\":%.1f,\"average_speed\":%.2f,\"rainAnalog\":%d,\"rainDigital\":%d}\n",
+             "{\"co\":%d,\"average_speed\":%.2f,\"distance1_cm\":%.1f,\"distance2_cm\":%.1f,\"rainAnalog\":%d,\"rainDigital\":%d}\n",
              sample->co,
-             sample->temperature_c,
-             sample->humidity_pct,
              sample->average_speed_mps,
+             sample->distance_1_cm,
+             sample->distance_2_cm,
              sample->rain_analog,
              sample->rain_digital);
 }

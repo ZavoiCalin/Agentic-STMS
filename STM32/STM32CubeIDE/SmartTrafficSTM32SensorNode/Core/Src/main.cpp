@@ -1,13 +1,7 @@
-#include "hal_sensor_node.h"
-#include "traffic_analytics.h"
 #include "mics6814.h"
 
-#include <string.h>
-
-ADC_HandleTypeDef hadc1;
-ADC_HandleTypeDef hadc2;
-UART_HandleTypeDef huart2;
-TIM_HandleTypeDef htim1;
+static ADC_HandleTypeDef hadc1;
+static UART_HandleTypeDef huart2;
 
 static void SystemClock_Config(void)
 {
@@ -17,79 +11,30 @@ static void SystemClock_Config(void)
 static void MX_GPIO_Init(void)
 {
     __HAL_RCC_GPIOA_CLK_ENABLE();
-    __HAL_RCC_GPIOB_CLK_ENABLE();
     __HAL_RCC_GPIOC_CLK_ENABLE();
 
-    GPIO_InitTypeDef GPIO_InitStruct = {0};
-
-    GPIO_InitStruct.Pin = CO_ADC_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(CO_ADC_PORT, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = RAIN_ADC_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_ANALOG;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(RAIN_ADC_PORT, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = RAIN_DIGITAL_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(RAIN_DIGITAL_PORT, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = DHT_DATA_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(DHT_DATA_PORT, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = TRIG1_PIN | TRIG2_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_OUTPUT_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = ECHO1_PIN | ECHO2_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_INPUT;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = BT_UART_TX_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(BT_UART_TX_PORT, &GPIO_InitStruct);
-
-    GPIO_InitStruct.Pin = BT_UART_RX_PIN;
-    GPIO_InitStruct.Mode = GPIO_MODE_AF_PP;
-    GPIO_InitStruct.Pull = GPIO_NOPULL;
-    GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_HIGH;
-    HAL_GPIO_Init(BT_UART_RX_PORT, &GPIO_InitStruct);
+    GPIO_InitTypeDef gpio = {0};
+    gpio.Pin = BT_UART_TX_PIN | BT_UART_RX_PIN;
+    gpio.Mode = GPIO_MODE_AF_PP;
+    gpio.Pull = GPIO_NOPULL;
+    gpio.Speed = GPIO_SPEED_FREQ_HIGH;
+    gpio.Alternate = GPIO_AF7_USART2;
+    HAL_GPIO_Init(BT_UART_TX_PORT, &gpio);
 }
 
 static void MX_ADC_Init(void)
 {
     __HAL_RCC_ADC1_CLK_ENABLE();
-    __HAL_RCC_ADC2_CLK_ENABLE();
 
     hadc1.Instance = ADC1;
     hadc1.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
     hadc1.Init.Resolution = ADC_RESOLUTION_12B;
     hadc1.Init.ScanConvMode = DISABLE;
     hadc1.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-    hadc1.Init.ContinuousConvMode = ENABLE;
+    hadc1.Init.ContinuousConvMode = DISABLE;
     hadc1.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-    hadc1.Init.NbrOfConversion = 1;
+    hadc1.Init.NbrOfConversion = 1U;
     HAL_ADC_Init(&hadc1);
-
-    hadc2.Instance = ADC2;
-    hadc2.Init.ClockPrescaler = ADC_CLOCK_SYNC_PCLK_DIV4;
-    hadc2.Init.Resolution = ADC_RESOLUTION_12B;
-    hadc2.Init.ScanConvMode = DISABLE;
-    hadc2.Init.EOCSelection = ADC_EOC_SINGLE_CONV;
-    hadc2.Init.ContinuousConvMode = ENABLE;
-    hadc2.Init.DataAlign = ADC_DATAALIGN_RIGHT;
-    hadc2.Init.NbrOfConversion = 1;
-    HAL_ADC_Init(&hadc2);
 }
 
 static void MX_USART2_UART_Init(void)
@@ -97,7 +42,7 @@ static void MX_USART2_UART_Init(void)
     __HAL_RCC_USART2_CLK_ENABLE();
 
     huart2.Instance = USART2;
-    huart2.Init.BaudRate = 9600; /* matches the HC-05/06 default, as in the Arduino sketch */
+    huart2.Init.BaudRate = 9600U;
     huart2.Init.WordLength = UART_WORDLENGTH_8B;
     huart2.Init.StopBits = UART_STOPBITS_1;
     huart2.Init.Parity = UART_PARITY_NONE;
@@ -105,33 +50,6 @@ static void MX_USART2_UART_Init(void)
     huart2.Init.HwFlowCtl = UART_HWCONTROL_NONE;
     huart2.Init.OverSampling = UART_OVERSAMPLING_16;
     HAL_UART_Init(&huart2);
-}
-
-static void MX_TIM1_Init(void)
-{
-    __HAL_RCC_TIM1_CLK_ENABLE();
-
-    htim1.Instance = TIM1;
-    htim1.Init.Prescaler = 95U;
-    htim1.Init.CounterMode = TIM_COUNTERMODE_UP;
-    htim1.Init.Period = 65535U;
-    htim1.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
-    htim1.Init.RepetitionCounter = 0U;
-    HAL_TIM_Base_Init(&htim1);
-}
-
-static void build_lane_samples(lane_sample_t *lanes)
-{
-    const lane_sample_t default_lanes[TRAFFIC_LANE_COUNT] = {
-        {8U, 42U, 12U, 18U, 28U, false},
-        {13U, 68U, 27U, 34U, 18U, false},
-        {6U, 31U, 9U, 14U, 30U, false},
-        {10U, 55U, 19U, 22U, 24U, false}
-    };
-
-    for (size_t i = 0; i < TRAFFIC_LANE_COUNT; ++i) {
-        lanes[i] = default_lanes[i];
-    }
 }
 
 int main(void)
@@ -142,26 +60,11 @@ int main(void)
     mics6814_gpio_init();
     MX_ADC_Init();
     MX_USART2_UART_Init();
-    MX_TIM1_Init();
 
-    stm32_sensor_node_t sensor_node;
-    traffic_analytics_t analytics;
-    traffic_decision_t decision;
-    lane_sample_t lanes[TRAFFIC_LANE_COUNT];
-    char mics_json[MICS_JSON_SIZE];
-
-    stm32_sensor_node_init(&sensor_node, &hadc1, &hadc2, &huart2, &htim1);
-    traffic_analytics_init(&analytics);
-
+    char telemetry[MICS_JSON_SIZE];
     for (;;) {
-        mics6814_read_json(&hadc1, mics_json, sizeof(mics_json));
-
-        build_lane_samples(lanes);
-        traffic_analytics_update(&analytics, lanes, TRAFFIC_LANE_COUNT);
-        decision = traffic_analytics_evaluate(&analytics);
-        traffic_analytics_print_state(&decision);
-
-        mics6814_send(&huart2, mics_json);
+        mics6814_read_json(&hadc1, telemetry, sizeof(telemetry));
+        mics6814_send(&huart2, telemetry);
         HAL_Delay(1000U);
     }
 }
